@@ -17,7 +17,7 @@ button,input,select{font:inherit}button{border:0;border-radius:10px;padding:10px
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.stat{border:1px solid var(--border);border-radius:12px;padding:10px}.stat b{display:block}.stat span{font-size:12px;color:var(--muted)}
 .tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:14px}.tabs button{background:white;border:1px solid var(--border);color:var(--muted)}.tabs button.active{background:var(--bluebg);color:var(--blue);border-color:#bfdbfe}
 .view{display:none}.view.active{display:block}
-.foodrow{display:grid;grid-template-columns:30px 1fr 100px 40px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}.foodrow:last-child{border-bottom:0}.foodname{font-weight:650}
+.foodrow{display:grid;grid-template-columns:30px 1fr 100px 40px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}.foodrow:last-child{border-bottom:0}.foodname{font-weight:650}.foodrow select{margin-top:6px;padding:7px;font-size:13px}
 input,select{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:white;color:var(--text)}
 .meal{margin-bottom:12px}.meal h3{margin:0 0 7px;font-size:16px}.mealbox{border:1px solid var(--border);border-radius:13px;padding:10px}
 .mealline{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)}.mealline:last-child{border-bottom:0}
@@ -51,12 +51,22 @@ input,select{width:100%;padding:10px;border:1px solid var(--border);border-radiu
 </section>
 
 <section id="meals" class="view">
-<div class="card"><h3>Meals</h3><p class="muted">Foods logged today are grouped here by meal. Choose a meal when logging below.</p><div id="mealSummary"></div></div>
+<div class="card"><h3>Meals</h3><p class="muted">Choose the meal for each food directly on the Today page, or use Quick meal log below.</p><div id="mealSummary"></div></div>
 <div class="card"><h3>Quick meal log</h3><div class="grid2"><div><label class="label">Food</label><select id="mealFood"></select></div><div><label class="label">Meal</label><select id="mealType"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snacks</option></select></div></div><div style="margin-top:10px" class="grid2"><div><label class="label">Quantity</label><input id="mealQty" type="number" min="0" step=".1" placeholder="e.g. 150"></div><div><label class="label">Unit</label><input id="mealUnit" disabled></div></div><div class="actions"><button id="addMeal">Add to meal</button></div></div>
 </section>
 
 <section id="progress" class="view">
-<div class="card"><h3>Last 7 days</h3><div class="chart"><div class="bars" id="bars"></div></div></div>
+<div class="card"><h3>Progress</h3>
+<div class="tabs" id="rangeTabs" style="grid-template-columns:repeat(5,1fr);margin:10px 0 0">
+<button class="active" data-range="7">7 Days</button>
+<button data-range="30">30 Days</button>
+<button data-range="90">3 Months</button>
+<button data-range="180">6 Months</button>
+<button data-range="365">1 Year</button>
+</div>
+<button id="allTimeBtn" class="ghost" style="width:100%;margin-top:8px">All Time</button>
+</div>
+<div class="card"><h3 id="progressTitle">Last 7 days</h3><div class="chart"><div class="bars" id="bars"></div></div></div>
 <div class="card"><div class="grid3"><div><div class="muted">7-day avg protein</div><strong id="avgProtein">0 g</strong></div><div><div class="muted">Target days</div><strong id="hitDays">0 / 7</strong></div><div><div class="muted">Current weight</div><strong id="currentWeight">—</strong></div></div></div>
 <div class="card"><h3>Body tracking</h3><div class="grid2"><div><label class="label">Weight (kg)</label><input id="weightInput" type="number" min="0" step=".1"></div><div><label class="label">Waist (cm)</label><input id="waistInput" type="number" min="0" step=".1"></div></div><div class="actions"><button id="saveBody">Save today's measurements</button></div></div>
 <div class="card"><h3>History</h3><div id="history"></div></div>
@@ -105,9 +115,30 @@ function esc(s){return String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;'
 function calc(d=getDay()){let p=0,k=0,c=0,f=0;state.foods.forEach(x=>{let q=Number(d[x.id])||0,m=q/100;p+=x.p*m;k+=x.k*m;c+=x.c*m;f+=x.f*m});return{p,k,c,f}}
 function renderToday(){
  const d=getDay();
- $('foodList').innerHTML=state.foods.length?state.foods.map(x=>`<div class="foodrow"><input type="checkbox" data-check="${x.id}" ${d[x.id]!=null?'checked':''}><div><div class="foodname">${esc(x.name)}</div><div class="muted">${x.p}g P · ${x.k} kcal / 100 ${esc(x.unit)}</div></div><input data-qty="${x.id}" type="number" min="0" step=".1" value="${d[x.id]??''}" placeholder="${esc(x.unit)}"><span class="muted">${esc(x.unit)}</span></div>`).join(''):'<div class="empty">Add foods from the Foods tab.</div>';
- document.querySelectorAll('[data-check]').forEach(el=>el.addEventListener('change',function(){let id=this.dataset.check;if(this.checked)d[id]=d[id]||100;else delete d[id];save();renderAll()}));
- document.querySelectorAll('[data-qty]').forEach(el=>el.addEventListener('input',function(){let v=Number(this.value),id=this.dataset.qty;if(Number.isFinite(v)&&v>=0)d[id]=v;else delete d[id];save();updateTotals()}));
+ $('foodList').innerHTML=state.foods.length?state.foods.map(x=>`<div class="foodrow">
+<input type="checkbox" data-check="${x.id}" ${d[x.id]!=null?'checked':''}>
+<div>
+<div class="foodname">${esc(x.name)}</div>
+<div class="muted">${x.p}g P · ${x.k} kcal / 100 ${esc(x.unit)}</div>
+<select data-meal="${x.id}" ${d[x.id]==null?'disabled':''}>
+<option value="Breakfast" ${(d.meals&&d.meals[x.id]==='Breakfast')?'selected':''}>Breakfast</option>
+<option value="Lunch" ${(d.meals&&d.meals[x.id]==='Lunch')?'selected':''}>Lunch</option>
+<option value="Dinner" ${(d.meals&&d.meals[x.id]==='Dinner')?'selected':''}>Dinner</option>
+<option value="Snacks" ${(!d.meals||!d.meals[x.id]||d.meals[x.id]==='Snacks')?'selected':''}>Snacks</option>
+</select>
+</div>
+<input data-qty="${x.id}" type="number" min="0" step=".1" value="${d[x.id]??''}" placeholder="${esc(x.unit)}">
+<span class="muted">${esc(x.unit)}</span>
+</div>`).join(''):'<div class="empty">Add foods from the Foods tab.</div>';
+ document.querySelectorAll('[data-check]').forEach(el=>el.addEventListener('change',function(){
+ let id=this.dataset.check;
+ d.meals=d.meals||{};
+ if(this.checked){d[id]=d[id]||100;d.meals[id]=d.meals[id]||'Snacks';}
+ else{delete d[id];delete d.meals[id];}
+ save();renderAll();
+}));
+ document.querySelectorAll('[data-qty]').forEach(el=>el.addEventListener('input',function(){let v=Number(this.value),id=this.dataset.qty;let d=getDay();if(Number.isFinite(v)&&v>=0){d[id]=v;d.meals=d.meals||{};d.meals[id]=d.meals[id]||'Snacks';}else{delete d[id];if(d.meals)delete d.meals[id];}save();updateTotals();}));
+ document.querySelectorAll('[data-meal]').forEach(el=>el.addEventListener('change',function(){let d=getDay();d.meals=d.meals||{};d.meals[this.dataset.meal]=this.value;save();renderMeals();}));
  updateTotals();
 }
 function updateTotals(){
@@ -123,17 +154,41 @@ function renderMeals(){
  $('mealFood').innerHTML=state.foods.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
  const selected=$('mealFood').value;let x=state.foods.find(f=>f.id===selected);$('mealUnit').value=x?x.unit:'';
 }
+let progressRange=7;
+function getProgressDates(days){let arr=[];let total=days==='all'?Math.max(1,Object.keys(state.days).length):days;let end=new Date();for(let i=Number(total)-1;i>=0;i--){let dt=new Date();dt.setDate(dt.getDate()-i);arr.push(dt.toISOString().slice(0,10))}return arr}
 function renderProgress(){
- let arr=[];for(let i=6;i>=0;i--){let dt=new Date();dt.setDate(dt.getDate()-i);let key=dt.toISOString().slice(0,10),a=calc(state.days[key]||{});arr.push({key,a})}
+ let keys=getProgressDates(progressRange);
+ if(progressRange==='all'){
+   keys=Object.keys(state.days).sort();
+   if(!keys.length){let d=new Date();keys=[d.toISOString().slice(0,10)]}
+ }
+ let arr=keys.map(key=>{let a=calc(state.days[key]||{});return{key,a}});
  let max=Math.max(state.target||1,...arr.map(z=>z.a.p),1);
- $('bars').innerHTML=arr.map(z=>{let d=new Date(z.key+'T00:00:00');let h=Math.max(2,z.a.p/max*145);return `<div class="barwrap"><div class="barvalue">${z.a.p.toFixed(0)}</div><div class="bar" style="height:${h}px"></div><div class="barlabel">${d.toLocaleDateString(undefined,{weekday:'short'}).slice(0,3)}</div></div>`}).join('');
- $('avgProtein').textContent=(arr.reduce((s,z)=>s+z.a.p,0)/7).toFixed(1)+' g';
- $('hitDays').textContent=arr.filter(z=>z.a.p>=(state.target||0)).length+' / 7';
- let weights=arr.map(z=>state.body[z.key]?.weight).filter(v=>Number(v)>0);$('currentWeight').textContent=weights.length?weights[weights.length-1].toFixed(1)+' kg':'—';
- $('weightInput').value=state.body[today()]?.weight??'';$('waistInput').value=state.body[today()]?.waist??'';
- $('history').innerHTML=Object.keys(state.days).sort().reverse().map(k=>{let a=calc(state.days[k]);let b=state.body[k]||{};return `<div class="historyrow"><span>${new Date(k+'T00:00:00').toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}</span><span><strong>${a.p.toFixed(1)}g P</strong> · ${Math.round(a.k)} kcal${b.weight?` · ${b.weight}kg`:''}</span></div>`}).join('')||'<div class="empty">No history yet.</div>';
-}
-function renderFoods(){
+ let display=arr;
+ // Keep the chart readable for long ranges by sampling into at most 30 bars.
+ if(arr.length>30){
+   let step=Math.ceil(arr.length/30);
+   display=arr.filter((_,i)=>i%step===0||i===arr.length-1);
+ }
+ $('bars').innerHTML=display.map(z=>{
+   let d=new Date(z.key+'T00:00:00'),h=Math.max(2,z.a.p/max*145);
+   return `<div class="barwrap"><div class="barvalue">${z.a.p.toFixed(0)}</div><div class="bar" style="height:${h}px"></div><div class="barlabel">${d.toLocaleDateString(undefined,{day:'numeric',month:'short'})}</div></div>`;
+ }).join('');
+ let avg=arr.reduce((s,z)=>s+z.a.p,0)/(arr.length||1);
+ let hits=arr.filter(z=>z.a.p>=(state.target||0)).length;
+ $('avgProtein').textContent=avg.toFixed(1)+' g';
+ $('hitDays').textContent=hits+' / '+arr.length;
+ let weights=arr.map(z=>state.body[z.key]?.weight).filter(v=>Number(v)>0);
+ $('currentWeight').textContent=weights.length?weights[weights.length-1].toFixed(1)+' kg':'—';
+ $('weightInput').value=state.body[today()]?.weight??'';
+ $('waistInput').value=state.body[today()]?.waist??'';
+ let label=progressRange==='all'?'All time':progressRange===7?'Last 7 days':progressRange===30?'Last 30 days':progressRange===90?'Last 3 months':progressRange===180?'Last 6 months':'Last 1 year';
+ $('progressTitle').textContent=label;
+ $('history').innerHTML=Object.keys(state.days).sort().reverse().map(k=>{
+   let a=calc(state.days[k]),b=state.body[k]||{};
+   return `<div class="historyrow"><span>${new Date(k+'T00:00:00').toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}</span><span><strong>${a.p.toFixed(1)}g P</strong> · ${Math.round(a.k)} kcal${b.weight?` · ${b.weight}kg`:''}</span></div>`;
+ }).join('')||'<div class="empty">No history yet.</div>';
+}function renderFoods(){
  $('database').innerHTML=state.foods.length?state.foods.map(x=>`<div class="dbrow"><div class="dbtop"><div><strong>${esc(x.name)}</strong><div class="muted">${esc(x.unit)} · ${x.p}g P · ${x.k} kcal · ${x.c}g carbs / 100</div></div><div class="dbactions"><button class="small" data-edit="${x.id}">Edit</button><button class="small danger" data-delete="${x.id}">Delete</button></div></div><div class="edit" id="edit_${x.id}"><input data-name="${x.id}" value="${esc(x.name)}"><select data-unit="${x.id}"><option value="g">g</option><option value="ml">ml</option><option value="piece">piece</option><option value="scoop">scoop</option></select><input data-p="${x.id}" type="number" min="0" step=".1" value="${x.p}"><input data-k="${x.id}" type="number" min="0" step="1" value="${x.k}"><input data-c="${x.id}" type="number" min="0" step=".1" value="${x.c}"><button data-save="${x.id}">Save</button></div></div>`).join(''):'<div class="empty">No foods yet.</div>';
  state.foods.forEach(x=>{let s=document.querySelector(`[data-unit="${x.id}"]`);if(s)s.value=x.unit});
  document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>$( 'edit_'+b.dataset.edit).classList.toggle('open')));
@@ -141,6 +196,19 @@ function renderFoods(){
  document.querySelectorAll('[data-save]').forEach(b=>b.addEventListener('click',()=>{let id=b.dataset.save,x=state.foods.find(f=>f.id===id);if(!x)return;let n=document.querySelector(`[data-name="${id}"]`).value.trim(),u=document.querySelector(`[data-unit="${id}"]`).value,p=Number(document.querySelector(`[data-p="${id}"]`).value),k=Number(document.querySelector(`[data-k="${id}"]`).value),c=Number(document.querySelector(`[data-c="${id}"]`).value);if(!n||![p,k,c].every(v=>Number.isFinite(v)&&v>=0))return;Object.assign(x,{name:n,unit:u,p,k,c});save();renderAll()}));
 }
 function renderAll(){save();$('date').textContent=new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric'});$('targetInput').value=state.target;renderToday();renderMeals();renderProgress();renderFoods()}
+document.querySelectorAll('[data-range]').forEach(b=>b.addEventListener('click',()=>{
+ progressRange=Number(b.dataset.range);
+ document.querySelectorAll('[data-range]').forEach(x=>x.classList.remove('active'));
+ b.classList.add('active');
+ $('allTimeBtn').classList.remove('active');
+ renderProgress();
+}));
+$('allTimeBtn').addEventListener('click',()=>{
+ progressRange='all';
+ document.querySelectorAll('[data-range]').forEach(x=>x.classList.remove('active'));
+ $('allTimeBtn').classList.add('active');
+ renderProgress();
+});
 document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$(b.dataset.view).classList.add('active');document.querySelectorAll('[data-view]').forEach(x=>x.classList.remove('active'));b.classList.add('active');if(b.dataset.view==='meals')renderMeals();if(b.dataset.view==='progress')renderProgress();if(b.dataset.view==='foods')renderFoods()}));
 $('targetInput').addEventListener('input',e=>{state.target=Math.max(0,Number(e.target.value)||0);save();updateTotals()});
 $('clearToday').addEventListener('click',()=>{if(confirm("Clear today's food entries?")){delete state.days[today()];save();renderAll()}});
