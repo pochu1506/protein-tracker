@@ -1,1 +1,17 @@
-{"name":"Protein Tracker","short_name":"Protein Tracker","start_url":"./","display":"standalone","background_color":"#f5f7fb","theme_color":"#111827","description":"Personal nutrition and protein tracker","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+{
+  "name": "Protein Tracker V3",
+  "short_name": "Protein Tracker",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#111827",
+  "description": "Personal nutrition tracker",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

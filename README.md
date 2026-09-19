@@ -1,5 +1,1 @@
-# Protein Tracker V3
-
-V3 adds a dashboard, meal sections, weekly protein chart, 7-day average, target-day count, weight and waist tracking, history, custom units, and editable/deletable food database.
-
-To update an existing GitHub Pages app, replace the old files in the repository root with these files and commit the changes.
+Protein Tracker V3 fixed build. Upload all files to the root of your GitHub Pages repository. This build uses a fresh storage key to avoid conflicts with the broken V3 cache.
