@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<meta name="description" content="Personal daily protein and calorie tracker">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Protein Tracker</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--border:#e5e7eb;--accent:#2563eb;--accent2:#eff6ff;--danger:#dc2626}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--text)}
+.app{max-width:760px;margin:auto;padding:18px 14px 90px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+h1{font-size:24px;margin:0}.sub{color:var(--muted);font-size:13px;margin-top:3px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:14px}
+.hero{display:grid;grid-template-columns:140px 1fr;gap:18px;align-items:center}
+@media(max-width:520px){.hero{grid-template-columns:1fr}}
+.ring{width:132px;height:132px;border-radius:50%;display:grid;place-items:center;margin:auto;background:conic-gradient(var(--accent) var(--pct),#e5e7eb 0)}
+.ring:after{content:"";width:102px;height:102px;background:white;border-radius:50%;position:absolute}
+.ringtext{position:relative;z-index:1;text-align:center}.ringtext strong{display:block;font-size:25px}.ringtext span{font-size:12px;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.stat{border:1px solid var(--border);border-radius:13px;padding:11px}.stat b{display:block;font-size:18px}.stat small{color:var(--muted)}
+.row{display:grid;grid-template-columns:30px 1fr 105px 45px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}.row:last-child{border-bottom:0}
+.foodname{font-weight:650}.meta{font-size:12px;color:var(--muted)}
+input,select,button{font:inherit}input,select{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:white}
+button{border:0;border-radius:10px;padding:10px 13px;font-weight:650;cursor:pointer;background:var(--accent2);color:var(--accent)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.danger{color:var(--danger);background:#fef2f2}
+.addgrid{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr auto;gap:8px;align-items:end}
+@media(max-width:650px){.addgrid{grid-template-columns:1fr 1fr}.addgrid button{grid-column:1/-1}}
+.label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+nav{position:fixed;bottom:0;left:0;right:0;background:white;border-top:1px solid var(--border);padding:8px max(12px,calc((100% - 740px)/2));display:flex;justify-content:space-around;z-index:5}
+nav button{background:transparent;color:var(--muted)}nav button.active{color:var(--accent)}
+.view{display:none}.view.active{display:block}
+.history-item{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.empty{color:var(--muted);text-align:center;padding:18px}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div><h1>Protein Tracker</h1><div class="sub" id="date"></div></div><button id="install" style="display:none">Install</button></header>
+
+<section id="todayView" class="view active">
+<div class="card hero">
+<div class="ring" id="ring"><div class="ringtext"><strong id="proteinTotal">0</strong><span>g protein</span></div></div>
+<div>
+<label class="label">Daily protein target</label><input id="target" type="number" min="0" step="1">
+<div style="height:10px"></div><div class="stats">
+<div class="stat"><b id="calTotal">0</b><small>kcal</small></div>
+<div class="stat"><b id="carbTotal">0</b><small>g carbs</small></div>
+<div class="stat"><b id="fatTotal">0</b><small>g fat</small></div>
+</div>
+<p class="sub" id="remaining"></p>
+</div>
+</div>
+
+<div class="card"><h3>Today's foods</h3><div id="foodList"></div>
+<div class="actions"><button id="clearDay" class="danger">Clear today</button></div></div>
+</section>
+
+<section id="historyView" class="view">
+<div class="card"><h3>History</h3><div id="history"></div></div>
+</section>
+
+<section id="foodsView" class="view">
+<div class="card"><h3>Add a food</h3><div class="sub">Enter nutrition per 100 g. For a serving-based item such as whey, use 100 as the reference amount and enter its equivalent values.</div>
+<div class="addgrid" style="margin-top:12px">
+<div><label class="label">Name</label><input id="newName" placeholder="Tofu"></div>
+<div><label class="label">Protein</label><input id="newP" type="number" min="0" step=".1" placeholder="17"></div>
+<div><label class="label">Calories</label><input id="newC" type="number" min="0" step="1" placeholder="144"></div>
+<div><label class="label">Carbs</label><input id="newCarb" type="number" min="0" step=".1" placeholder="3"></div>
+<button id="addFood">Add</button></div></div>
+<div class="card"><h3>Your food database</h3><div id="database"></div></div>
+</section>
+</div>
+
+<nav>
+<button data-tab="todayView" class="active">Today</button>
+<button data-tab="historyView">History</button>
+<button data-tab="foodsView">Foods</button>
+</nav>
+
+<script>
+const KEY='proteinTrackerV2';
+const defaultFoods=[
+{name:'Soya chunks (dry)',p:52,k:345,c:33,f:.5},
+{name:'Paneer',p:18,k:265,c:3.4,f:20},
+{name:'Egg',p:12.6,k:143,c:1.1,f:9.5},
+{name:'Milk',p:3.2,k:60,c:4.8,f:3.2},
+{name:'Curd',p:3.5,k:60,c:4.7,f:3.3},
+{name:'Whey protein',p:24,k:120,c:3,f:2},
+{name:'Dal (cooked)',p:8,k:115,c:20,f:.4},
+{name:'Rajma (cooked)',p:8.7,k:127,c:22.8,f:.5},
+{name:'Chana (cooked)',p:8.9,k:164,c:27.4,f:2.6},
+{name:'Besan',p:22,k:387,c:58,f:6.7},
+{name:'Peanuts',p:25.8,k:567,c:16.1,f:49.2},
+{name:'Tofu',p:17,k:144,c:2.8,f:8.7}
+];
+let state=JSON.parse(localStorage.getItem(KEY)||'null')||{foods:defaultFoods,target:140,days:{}};
+const today=()=>new Date().toISOString().slice(0,10);
+const save=()=>localStorage.setItem(KEY,JSON.stringify(state));
+function esc(s){return String(s).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));}
+function day(){return state.days[today()]||(state.days[today()]={});}
+function calc(){
+ let p=0,k=0,c=0,f=0,d=day();
+ state.foods.forEach((x,i)=>{let q=Number(d[i])||0, m=q/100;p+=x.p*m;k+=x.k*m;c+=x.c*m;f+=x.f*m});
+ return {p,k,c,f};
+}
+function render(){
+ document.getElementById('date').textContent=new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+ document.getElementById('target').value=state.target;
+ const d=day();
+ document.getElementById('foodList').innerHTML=state.foods.map((x,i)=>`
+ <div class="row"><input type="checkbox" data-check="${i}" ${d[i]!=null?'checked':''}>
+ <div><div class="foodname">${esc(x.name)}</div><div class="meta">${x.p}g protein · ${x.k} kcal / 100g</div></div>
+ <input data-q="${i}" type="number" min="0" step=".1" placeholder="grams" value="${d[i]??''}">
+ <span class="meta">g</span></div>`).join('');
+ document.getElementById('database').innerHTML=state.foods.map(x=>`<div class="history-item"><span>${esc(x.name)}</span><span class="meta">${x.p}g P · ${x.k} kcal</span></div>`).join('');
+ document.querySelectorAll('[data-check]').forEach(e=>e.onchange=()=>{let i=+e.dataset.check;if(e.checked)d[i]=100;else delete d[i];save();render();});
+ document.querySelectorAll('[data-q]').forEach(e=>e.oninput=()=>{let i=+e.dataset.q;let v=Number(e.value);if(Number.isFinite(v)&&v>=0)d[i]=v;else delete d[i];save();update();});
+ update();renderHistory();
+}
+function update(){
+ const a=calc(),t=Number(state.target)||0;
+ document.getElementById('proteinTotal').textContent=a.p.toFixed(1);
+ document.getElementById('calTotal').textContent=Math.round(a.k);
+ document.getElementById('carbTotal').textContent=a.c.toFixed(1);
+ document.getElementById('fatTotal').textContent=a.f.toFixed(1);
+ document.getElementById('remaining').textContent=a.p>=t?`${(a.p-t).toFixed(1)} g above target`:`${(t-a.p).toFixed(1)} g remaining`;
+ const pct=t?Math.min(100,a.p/t*100):0;document.getElementById('ring').style.setProperty('--pct',pct+'%');
+}
+function renderHistory(){
+ const el=document.getElementById('history'),keys=Object.keys(state.days).sort().reverse();
+ if(!keys.length){el.innerHTML='<div class="empty">No saved days yet.</div>';return}
+ el.innerHTML=keys.map(k=>{let a=calcDay(state.days[k]);return `<div class="history-item"><span>${new Date(k+'T00:00:00').toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}</span><strong>${a.p.toFixed(1)} g P · ${Math.round(a.k)} kcal</strong></div>`}).join('');
+}
+function calcDay(d){let p=0,k=0;state.foods.forEach((x,i)=>{let q=Number(d[i])||0,m=q/100;p+=x.p*m;k+=x.k*m});return{p,k}}
+document.getElementById('target').oninput=e=>{state.target=Math.max(0,Number(e.target.value)||0);save();update()};
+document.getElementById('clearDay').onclick=()=>{delete state.days[today()];save();render()};
+document.getElementById('addFood').onclick=()=>{let n=document.getElementById('newName').value.trim(),p=Number(document.getElementById('newP').value),k=Number(document.getElementById('newC').value),c=Number(document.getElementById('newCarb').value)||0;if(!n||!Number.isFinite(p)||!Number.isFinite(k)||p<0||k<0)return;state.foods.push({name:n,p,k,c,f:0});['newName','newP','newC','newCarb'].forEach(id=>document.getElementById(id).value='');save();render()};
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(b.dataset.tab).classList.add('active');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active')});
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('install').style.display='block'});
+document.getElementById('install').onclick=async()=>{if(deferredPrompt){deferredPrompt.prompt();deferredPrompt=null}};
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+render();
+</script>
+</body>
+</html>
